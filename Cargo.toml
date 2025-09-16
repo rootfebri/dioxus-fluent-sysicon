@@ -1,0 +1,37 @@
+[package]
+name = "dioxus-fluent-sysicon"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+syn = "2.0.106"
+quote = "1.0.40"
+proc-macro2 = "1.0.101"
+
+[dependencies.dioxus]
+version = "0.6.3"
+default-features = false
+features = [
+    "html",
+    "document",
+    "macro",
+    "signals"
+]
+
+[dependencies.html_parser]
+version = "0.7.0"
+
+[dependencies.rsx-rosetta]
+version = "0.6.0-alpha.2"
+
+[dependencies.dioxus-rsx]
+version = "0.6"
+
+[dependencies.dioxus-autofmt]
+version = "0.6.2"
+
+[dependencies.heck]
+version = "0.5.0"
