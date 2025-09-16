@@ -1,72 +1,106 @@
 //! parse_input.rs
-use proc_macro2::TokenStream;
-use quote::__private::ext::RepToTokensExt;
-use quote::quote;
-use syn::Expr;
+#![allow(unused)]
 
-pub fn parse_param(input: Expr) -> TokenStream {
-  let str = match input.next().unwrap() {
-    Expr::Lit(
-      syn::ExprLit {
-        lit: syn::Lit::Str(str),
-        ..
-      },
-      ..,
-    ) => str,
-    _ => {
-      panic!("TODO: Panic message")
-    }
-  };
+use dioxus_rsx::{BodyNode, CallBody, TemplateBody};
+use heck::ToPascalCase;
+use proc_macro2::{Span, TokenStream};
+use quote::{quote, ToTokens};
+use syn::parse::{Parse, ParseStream};
+use syn::{parse, Error, Token};
 
-  generate(str.value(), input)
+struct Icon {
+  key: syn::Ident,
+  _colon: Token![:],
+  value: syn::LitStr,
+  _comma: Option<Token![,]>,
+  svg: String,
 }
 
-fn generate(icon_name: String, expr: Expr) -> TokenStream {
-  let manifest = std::env::var("CARGO_MANIFEST_DIR").unwrap();
+pub(crate) struct InputTree {
+  icon: Icon,
+  props: TokenStream, // ← sisa token (RSX props), bebas
+}
 
-  let file = format!("{manifest}/assets/{icon_name}.svg");
-  let icon = quote! {::core::include_str!(#file)}.to_string();
-  let rsx = translate(icon);
+impl Icon {
+  fn check_key(self) -> syn::Result<Self> {
+    if self.key == "name" {
+      Ok(self)
+    } else {
+      Err(Error::new(self.key.span(), "expected `name: \"...\"`"))
+    }
+  }
 
-  quote! {{
-    extern crate dioxus;
-    use dioxus::prelude::*;
+  fn load_svg(mut self) -> syn::Result<Self> {
+    self.svg = std::fs::read_to_string(format!(
+      "{}/assets/{}.svg",
+      crate::SELF_MANIFEST_DIR,
+      self.value.value()
+    ))
+    .map_err(|_| Error::new(Span::call_site(), format!("Cannot find icon `{}`", self.value.value())))?;
+    Ok(self)
+  }
 
-    #[component]
-    #[allow(non_snake_case)]
-    /// TODO: `#[doc = define_doc!(#icon_name)]`
-    pub fn #icon_name(#[props(extends = GlobalAttributes, extends = svg)] attributes: Vec<Attribute>) {
-      rsx! {
-        #rsx
+  fn translate(&self, props: TokenStream) -> TokenStream {
+    let dom = html_parser::Dom::parse(&self.svg).unwrap();
+    let mut body = rsx_rosetta::rsx_from_html(&dom);
+
+    // tambahkan spread `..attributes`
+    if let Some(BodyNode::Element(el)) = body.body.roots.first_mut() {
+      let hollow: TokenStream = quote::quote! { div { #props } };
+      let CallBody {
+        body: TemplateBody { roots, .. },
+        ..
+      } = parse::<CallBody>(hollow.into()).unwrap();
+
+      if let Some(BodyNode::Element(dummy_element)) = roots.into_iter().next() {
+        el.raw_attributes.extend(dummy_element.raw_attributes);
+        el.merged_attributes.extend(dummy_element.merged_attributes);
       }
     }
 
-    #icon_name {#expr}
-  }}
+    // render jadi teks RSX (rapi)…
+    let block_out = dioxus_autofmt::write_block_out(&body).unwrap();
+    let rsx_str = dioxus_autofmt::fmt_block(
+      &block_out,
+      1,
+      dioxus_autofmt::IndentOptions::new(dioxus_autofmt::IndentType::Spaces, 2, false),
+    )
+    .unwrap();
+
+    rsx_str.parse::<TokenStream>().expect("RSX to tokens failed")
+  }
 }
 
-fn translate(html: impl AsRef<str>) -> TokenStream {
-  let dom = html_parser::Dom::parse(html.as_ref()).unwrap();
-  let mut callbody = rsx_rosetta::rsx_from_html(&dom);
-  if let Some(dioxus_rsx::BodyNode::Element(element)) = callbody.body.roots.first_mut() {
-    let expr: Expr = syn::parse_quote! { attributes };
-    let dots: syn::token::DotDot = syn::parse_quote! {..};
-    let comma: Option<syn::token::Comma> = Some(syn::parse_quote! {,});
-    let global_attribute = dioxus_rsx::Spread {
-      dots,
-      expr,
-      comma,
-      dyn_idx: Default::default(),
-    };
-
-    element.spreads.push(global_attribute)
+impl Parse for Icon {
+  fn parse(input: ParseStream) -> syn::Result<Self> {
+    Icon {
+      key: input.parse()?,
+      _colon: input.parse()?,
+      value: input.parse()?,
+      _comma: input.parse()?,
+      svg: Default::default(),
+    }
+    .check_key()?
+    .load_svg()
   }
+}
 
-  let inden_opts = dioxus_autofmt::IndentOptions::new(dioxus_autofmt::IndentType::Spaces, 2, false);
-  let block_out = dioxus_autofmt::write_block_out(&callbody).unwrap_or_default();
-  let rsx = dioxus_autofmt::fmt_block(&block_out, 1, inden_opts.clone()).unwrap_or_default();
+impl Parse for InputTree {
+  fn parse(input: ParseStream) -> syn::Result<Self> {
+    let icon: Icon = input.parse()?;
+    let props: TokenStream = input.parse()?;
+    Ok(InputTree { icon, props })
+  }
+}
 
-  quote::quote! {
-    #rsx
+pub(crate) fn generate_token_stream(InputTree { icon, props }: InputTree) -> TokenStream {
+  let comp_name = icon.value.value().to_pascal_case();
+  let comp_ident = syn::Ident::new(&comp_name, Span::call_site());
+  let rsx = icon.translate(props);
+
+  quote! {
+    rsx! {
+      #rsx
+    }
   }
 }
