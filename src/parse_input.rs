@@ -40,7 +40,6 @@ impl Icon {
     let dom = html_parser::Dom::parse(&self.svg).unwrap();
     let mut body = rsx_rosetta::rsx_from_html(&dom);
 
-    // tambahkan spread `..attributes`
     if let Some(BodyNode::Element(el)) = body.body.roots.first_mut() {
       let hollow: TokenStream = quote::quote! { div { #props } };
       let CallBody {
@@ -51,10 +50,10 @@ impl Icon {
       if let Some(BodyNode::Element(dummy_element)) = roots.into_iter().next() {
         el.raw_attributes.extend(dummy_element.raw_attributes);
         el.merged_attributes.extend(dummy_element.merged_attributes);
+        el.spreads.extend(dummy_element.spreads);
       }
     }
 
-    // render jadi teks RSX (rapi)…
     let block_out = dioxus_autofmt::write_block_out(&body).unwrap();
     let rsx_str = dioxus_autofmt::fmt_block(
       &block_out,
