@@ -1,0 +1,4 @@
+The icon assets are sourced from Microsoft’s Fluent System Icons and follow their licensing. See the upstream repository for details:
+https://github.com/microsoft/fluentui-system-icons
+
+Code in this crate is licensed separately per the repository’s LICENSE files. The assets remain under their original license.

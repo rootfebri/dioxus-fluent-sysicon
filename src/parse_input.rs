@@ -1,10 +1,6 @@
-//! parse_input.rs
-#![allow(unused)]
-
 use dioxus_rsx::{BodyNode, CallBody, TemplateBody};
-use heck::ToPascalCase;
 use proc_macro2::{Span, TokenStream};
-use quote::{quote, ToTokens};
+use quote::quote;
 use syn::parse::{Parse, ParseStream};
 use syn::{parse, Error, Token};
 
@@ -94,8 +90,6 @@ impl Parse for InputTree {
 }
 
 pub(crate) fn generate_token_stream(InputTree { icon, props }: InputTree) -> TokenStream {
-  let comp_name = icon.value.value().to_pascal_case();
-  let comp_ident = syn::Ident::new(&comp_name, Span::call_site());
   let rsx = icon.translate(props);
 
   quote! {
