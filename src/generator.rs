@@ -37,7 +37,7 @@ impl Component {
           #[props(extends = GlobalAttributes, extends = svg)] attributes: Vec<Attribute>
         ) -> Element {
           rsx! {
-            {::dioxus_fluent_sysicon::icon!{ name: #name, ..attributes }}
+            {::dioxus_fluent_sysicon::use_icon!{ name: #name, ..attributes }}
           }
         }
       }
