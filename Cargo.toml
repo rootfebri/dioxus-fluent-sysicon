@@ -1,6 +1,6 @@
 [package]
 name = "dioxus-fluent-sysicon"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 include = ["src/**", "assets/**", "Cargo.toml", "*.md", "LICENSE*"]
 description = "Microsoft Fluent System Icon for dioxus"
